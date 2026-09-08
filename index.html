@@ -54,6 +54,32 @@
       padding: 38px 0 46px;
     }
 
+    .site-switcher {
+      display: inline-flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: var(--radius);
+      padding: 4px;
+      background: rgba(255, 255, 255, 0.58);
+      box-shadow: var(--small-shadow);
+    }
+
+    .site-switcher a {
+      border-radius: 6px;
+      padding: 9px 13px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .site-switcher a:hover,
+    .site-switcher a[aria-current="page"] {
+      color: #fff;
+      background: var(--accent);
+    }
+
     .masthead {
       display: flex;
       align-items: end;
@@ -399,6 +425,10 @@
 </head>
 <body>
   <main class="page">
+    <nav class="site-switcher" aria-label="School type">
+      <a href="index.html" aria-current="page">Primary schools</a>
+      <a href="index_highschools.html">High schools</a>
+    </nav>
     <header class="masthead">
       <div>
         <p class="eyebrow">Gdansk and Gdynia ranking data</p>
