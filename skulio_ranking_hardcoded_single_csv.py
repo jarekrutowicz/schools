@@ -10,7 +10,7 @@ LOCATIONS = [
     {"type": "city", "name": "Gdynia", "teryt_code": None, "voivodeship": "POMORSKIE"},
 ]
 
-YEARS = range(2019, 2026)
+YEARS = range(2019, 2027)
 SUBJECTS = [None, "mathematics"]
 
 EXAM_TYPE = "e8"
@@ -22,7 +22,7 @@ HEADERS = {
     "Accept": "application/json",
 }
 TIMEOUT = 20
-OUTPUT_FILE = "skulio_ranking_gdansk_gdynia_2019_2025_all.csv"
+OUTPUT_FILE = "skulio_ranking_gdansk_gdynia_2019_2026_all.csv"
 
 CSV_FIELDS = [
     "year",

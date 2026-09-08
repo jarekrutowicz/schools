@@ -103,7 +103,7 @@
 
     .controls-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 310px;
+      grid-template-columns: minmax(0, 1fr) 310px 360px;
       gap: 22px;
       align-items: stretch;
     }
@@ -285,6 +285,61 @@
       text-align: right;
     }
 
+    .filter-panel {
+      height: 100%;
+      border: 1px solid rgba(217, 228, 233, 0.78);
+      border-radius: var(--radius);
+      padding: 18px;
+      background: rgba(249, 251, 252, 0.68);
+    }
+
+    .score-filters {
+      display: grid;
+      grid-template-columns: 72px 1fr 1fr;
+      gap: 8px;
+      align-items: center;
+      margin-top: 16px;
+    }
+
+    .filter-heading {
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .filter-year {
+      color: #40545d;
+      font-size: 0.88rem;
+      font-weight: 800;
+    }
+
+    .score-input {
+      width: 100%;
+      height: 36px;
+      border: 1px solid var(--soft);
+      border-radius: var(--radius);
+      padding: 0 10px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.8);
+      outline: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    .score-input:focus {
+      border-color: rgba(13, 148, 136, 0.6);
+      background: #fff;
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+
+    .filter-note {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
     .chart-card {
       position: relative;
       padding: 22px;
@@ -347,7 +402,7 @@
     <header class="masthead">
       <div>
         <p class="eyebrow">Gdansk and Gdynia ranking data</p>
-        <h1>School performance explorer, 2019-2025</h1>
+        <h1>School performance explorer, 2019-2026</h1>
       </div>
       <p class="summary">Compare overall and mathematics scores on a fixed 0-100 scale. Lines keep each school color consistent across subjects.</p>
     </header>
@@ -386,9 +441,18 @@
           </div>
           <div class="metric">
             <span>Y-axis</span><strong>0-100</strong>
-            <span>Years</span><strong>2019-2025</strong>
+            <span>Years</span><strong>2019-2026</strong>
             <span>Missing values</span><strong>Gaps</strong>
           </div>
+        </aside>
+
+        <aside class="filter-panel">
+          <div class="section-head">
+            <h2>Minimum scores</h2>
+            <span class="count" id="filterCount">No filters</span>
+          </div>
+          <div class="score-filters" id="scoreFilters" aria-label="Minimum score filters"></div>
+          <p class="filter-note">Filled values keep only schools with a score at or above that threshold for every matching year and subject.</p>
         </aside>
       </div>
     </section>
@@ -406,8 +470,9 @@
   </main>
 
   <script>
-    const CSV_FILE = "skulio_ranking_gdansk_gdynia_2019_2025_all.csv";
-    const YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025];
+    const CSV_FILE = "skulio_ranking_gdansk_gdynia_2019_2026_all.csv";
+    const YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+    const FILTER_YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
     const SUBJECT_LABELS = {
       overall: "Overall",
       mathematics: "Mathematics"
@@ -420,8 +485,11 @@
     const state = {
       rows: [],
       schools: [],
+      scoreIndex: new Map(),
+      eligibleSchools: [],
       selectedSchools: new Set(),
       selectedSubjects: new Set(["overall"]),
+      scoreFilters: new Map(),
       search: "",
       chart: null
     };
@@ -430,6 +498,8 @@
       schoolList: document.getElementById("schoolList"),
       schoolSearch: document.getElementById("schoolSearch"),
       schoolCount: document.getElementById("schoolCount"),
+      scoreFilters: document.getElementById("scoreFilters"),
+      filterCount: document.getElementById("filterCount"),
       selectAll: document.getElementById("selectAll"),
       clearAll: document.getElementById("clearAll"),
       chartStatus: document.getElementById("chartStatus"),
@@ -501,14 +571,18 @@
       const names = Array.from(new Set(state.rows.map((row) => row.school_name)))
         .sort((a, b) => a.localeCompare(b, "pl"));
       state.schools = names;
+      state.scoreIndex = rowIndex();
+      state.eligibleSchools = names;
       names.slice(0, Math.min(6, names.length)).forEach((name) => state.selectedSchools.add(name));
       elements.schoolSearch.classList.toggle("is-hidden", names.length <= 20);
+      renderScoreFilters();
+      applyScoreFilters();
       renderSchoolList();
     }
 
     function renderSchoolList() {
       const query = state.search.trim().toLocaleLowerCase("pl");
-      const visibleSchools = state.schools.filter((name) =>
+      const visibleSchools = state.eligibleSchools.filter((name) =>
         name.toLocaleLowerCase("pl").includes(query)
       );
 
@@ -551,10 +625,99 @@
     }
 
     function updateCounts(visibleCount = state.schools.length) {
-      elements.schoolCount.textContent = `${state.selectedSchools.size} selected of ${state.schools.length}`;
-      if (visibleCount !== state.schools.length) {
+      elements.schoolCount.textContent = `${state.selectedSchools.size} selected of ${state.eligibleSchools.length} eligible`;
+      if (state.eligibleSchools.length !== state.schools.length) {
+        elements.schoolCount.textContent += `, ${state.schools.length - state.eligibleSchools.length} filtered out`;
+      }
+      if (visibleCount !== state.eligibleSchools.length) {
         elements.schoolCount.textContent += `, ${visibleCount} shown`;
       }
+    }
+
+    function renderScoreFilters() {
+      elements.scoreFilters.innerHTML = "";
+      elements.scoreFilters.append(
+        makeFilterHeading("Year"),
+        makeFilterHeading("Overall"),
+        makeFilterHeading("Mathematics")
+      );
+
+      FILTER_YEARS.forEach((year) => {
+        const yearLabel = document.createElement("div");
+        yearLabel.className = "filter-year";
+        yearLabel.textContent = year;
+
+        elements.scoreFilters.append(
+          yearLabel,
+          makeScoreInput(year, "overall"),
+          makeScoreInput(year, "mathematics")
+        );
+      });
+    }
+
+    function makeFilterHeading(text) {
+      const heading = document.createElement("div");
+      heading.className = "filter-heading";
+      heading.textContent = text;
+      return heading;
+    }
+
+    function makeScoreInput(year, subject) {
+      const input = document.createElement("input");
+      input.className = "score-input";
+      input.type = "number";
+      input.min = "0";
+      input.max = "100";
+      input.step = "0.01";
+      input.inputMode = "decimal";
+      input.placeholder = "min";
+      input.setAttribute("aria-label", `${year} ${SUBJECT_LABELS[subject]} minimum score`);
+      input.dataset.year = String(year);
+      input.dataset.subject = subject;
+      input.addEventListener("input", () => {
+        updateScoreFilter(input);
+        applyScoreFilters();
+        renderSchoolList();
+        updateChart();
+      });
+      return input;
+    }
+
+    function updateScoreFilter(input) {
+      const key = `${input.dataset.year}||${input.dataset.subject}`;
+      const rawValue = input.value.trim();
+      if (rawValue === "") {
+        state.scoreFilters.delete(key);
+        return;
+      }
+
+      const value = Math.max(0, Math.min(100, Number(rawValue)));
+      if (Number.isFinite(value)) {
+        state.scoreFilters.set(key, value);
+      } else {
+        state.scoreFilters.delete(key);
+      }
+    }
+
+    function applyScoreFilters() {
+      const activeFilters = Array.from(state.scoreFilters.entries());
+      state.eligibleSchools = state.schools.filter((school) =>
+        activeFilters.every(([key, minimum]) => {
+          const [year, subject] = key.split("||");
+          const score = state.scoreIndex.get(`${school}||${subject}||${year}`);
+          return Number.isFinite(score) && score >= minimum;
+        })
+      );
+
+      state.selectedSchools.forEach((school) => {
+        if (!state.eligibleSchools.includes(school)) {
+          state.selectedSchools.delete(school);
+        }
+      });
+
+      elements.filterCount.textContent = activeFilters.length === 0
+        ? "No filters"
+        : `${activeFilters.length} active`;
     }
 
     function rowIndex() {
@@ -730,7 +893,7 @@
       });
 
       elements.selectAll.addEventListener("click", () => {
-        state.schools.forEach((name) => state.selectedSchools.add(name));
+        state.eligibleSchools.forEach((name) => state.selectedSchools.add(name));
         renderSchoolList();
         updateChart();
       });
