@@ -290,3 +290,8 @@ pyrightconfig.json
 
 .idea/**/*
 *.iml
+
+### Codex ###
+# Local Codex workspace metadata and agent configuration
+.codex/
+.agents/
