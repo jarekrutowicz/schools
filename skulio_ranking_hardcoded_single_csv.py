@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import csv
+import sys
 import time
 from time import sleep
 
 import requests
 
+
+UTF8_ENCODING = "utf-8"
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding=UTF8_ENCODING)
+    sys.stderr.reconfigure(encoding=UTF8_ENCODING)
+
 LOCATIONS = [
     {"type": "city", "name": "Gdańsk", "teryt_code": None, "voivodeship": "POMORSKIE"},
     {"type": "city", "name": "Gdynia", "teryt_code": None, "voivodeship": "POMORSKIE"},
+    {"type": "city", "name": "Sopot", "teryt_code": None, "voivodeship": "POMORSKIE"},
 ]
 
 YEARS = range(2019, 2027)
@@ -99,7 +109,7 @@ def fetch_combo(year, subject):
 
 
 def write_csv(rows, output_path):
-    with open(output_path, "w", newline="", encoding="utf-8-sig") as f:
+    with open(output_path, "w", newline="", encoding=f"{UTF8_ENCODING}-sig") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
@@ -121,9 +131,11 @@ def main():
             rows = fetch_combo(year, subject)
             all_rows.extend(rows)
 
-            gdansk_count = sum(1 for i in rows if i["city"] == "Gdańsk")
-            gdynia_count = sum(1 for i in rows if i["city"] == "Gdynia")
-            print(f"  -> Appended {len(rows)} rows (Gdańsk: {gdansk_count}, Gdynia: {gdynia_count})\n")
+            city_counts = ", ".join(
+                f"{loc['name']}: {sum(1 for i in rows if i['city'] == loc['name'])}"
+                for loc in LOCATIONS
+            )
+            print(f"  -> Appended {len(rows)} rows ({city_counts})\n")
 
             time.sleep(10)
 
